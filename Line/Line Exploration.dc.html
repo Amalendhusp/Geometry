@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html, body { height: 100%; margin: 0; overscroll-behavior: none; }
+  @keyframes lePulse { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
+</style>
+</helmet>
+<div data-screen-label="Line Exploration" style="height:100dvh;display:flex;flex-direction:column;background:var(--color-bg);color:var(--color-text);font-family:Archivo, system-ui, sans-serif;overflow:hidden;user-select:none">
+
+  <div style="display:flex;align-items:center;gap:12px;padding:14px 16px 12px;border-bottom:2px solid var(--color-divider)">
+    <span style="font-weight:800;font-size:15px;letter-spacing:.04em;text-transform:uppercase;margin-right:auto">Line Exploration</span>
+    <div onClick="{{ toggleLevel }}" style="display:flex;border:1px solid var(--color-divider);cursor:pointer">
+      <span style="padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:{{ freeBg }};color:{{ freeFg }}">Free</span>
+      <span style="padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border-left:1px solid var(--color-divider);background:{{ taskBg }};color:{{ taskFg }}">Task</span>
+    </div>
+    <span onClick="{{ openMenu }}" style="width:44px;height:44px;margin:-8px -10px -8px 0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+    </span>
+  </div>
+
+  <div style="padding:9px 16px 10px;border-bottom:1px solid var(--color-divider);pointer-events:none">
+    <div style="display:flex;align-items:center;gap:0;margin-bottom:6px">
+      <sc-for list="{{ stages }}" as="st" hint-placeholder-count="5">
+        <span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:{{ st.color }}">{{ st.label }}</span>
+        <span style="font-size:9px;padding:0 7px;color:var(--color-neutral-300)">{{ st.sep }}</span>
+      </sc-for>
+    </div>
+    <div style="position:relative;height:2px;background:color-mix(in srgb, var(--color-text) 12%, transparent)">
+      <div style="position:absolute;left:0;top:0;height:2px;background:var(--color-accent);width:{{ stageProgress }}"></div>
+    </div>
+  </div>
+
+  <sc-if value="{{ challengeOn }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--color-accent);color:var(--color-bg);border-bottom:2px solid var(--color-divider)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.75">Task {{ taskNo }}</div>
+        <div style="font-size:15px;font-weight:800;line-height:1.15;text-wrap:pretty">{{ taskText }}</div>
+      </div>
+      <span onClick="{{ nextTask }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-bg);padding:8px 10px;cursor:pointer">Next</span>
+    </div>
+  </sc-if>
+
+  <div style="position:relative;flex:1;min-height:0;background:var(--color-bg)">
+    <sc-if value="{{ gridOn }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;inset:0;background-image:repeating-linear-gradient(to right, color-mix(in srgb, var(--color-text) 9%, transparent) 0 1px, transparent 1px 100%),repeating-linear-gradient(to bottom, color-mix(in srgb, var(--color-text) 9%, transparent) 0 1px, transparent 1px 100%);background-size:32px 32px"></div>
+    </sc-if>
+    <canvas ref="{{ canvasRef }}" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+    <div ref="{{ surfaceRef }}" onPointerDown="{{ onDown }}" onPointerMove="{{ onMove }}" onPointerUp="{{ onUp }}" onPointerCancel="{{ onUp }}" style="position:absolute;inset:0;touch-action:none"></div>
+
+    <sc-if value="{{ patternFieldVisible }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:16px;top:14px;pointer-events:none;display:flex;flex-direction:column;gap:3px">
+        <span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent)">{{ patternViewLabel }}</span>
+        <span style="font-size:10px;letter-spacing:.04em;color:color-mix(in srgb, var(--color-text) 62%, transparent)">{{ patternFieldHint }}</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showInvite }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:20px;bottom:22px;right:20px;pointer-events:none">
+        <div style="font-size:30px;font-weight:800;line-height:1.05;letter-spacing:-0.02em">Touch and move<br>to make a line.</div>
+        <div style="font-size:12px;margin-top:10px;max-width:280px;color:color-mix(in srgb, var(--color-text) 60%, transparent);text-wrap:pretty">Move slowly, move fast, stop, turn. The line remembers all of it.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hintVisible }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:16px;top:14px;right:16px;pointer-events:none;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent)">{{ hintText }}</div>
+    </sc-if>
+
+    <sc-if value="{{ legendVisible }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:16px;bottom:14px;right:16px;pointer-events:none;display:flex;flex-direction:column;gap:4px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 65%, transparent)">
+        <span>{{ legendA }}</span>
+        <span>{{ legendB }}</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ motifTag }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;right:14px;top:12px;pointer-events:none;display:flex;align-items:center;gap:6px;background:var(--color-accent);color:var(--color-bg);padding:5px 9px;font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase">Motif</div>
+    </sc-if>
+
+    <sc-if value="{{ ghostPrompt }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:14px;right:14px;bottom:14px;background:var(--color-surface);border:2px solid var(--color-text);padding:12px 14px;display:flex;align-items:center;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent)">{{ ghostReading }}</div>
+          <div style="font-size:14px;font-weight:800;line-height:1.15">Repeat this movement?</div>
+        </div>
+        <span onClick="{{ acceptGhost }}" style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:var(--color-accent);color:var(--color-bg);cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Repeat</span>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ characterPanel }}" hint-placeholder-val="{{ false }}">
+    <div style="border-top:2px solid var(--color-divider);background:var(--color-surface);padding:14px 16px 16px;max-height:46dvh;overflow:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-right:auto">Character of the line</span>
+        <span onClick="{{ closePanel }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Done</span>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div onClick="{{ editA }}" style="flex:1;border:2px solid {{ aBorder }};padding:10px;cursor:pointer;display:flex;align-items:center;gap:10px">
+          <canvas ref="{{ previewARef }}" style="width:34px;height:34px;flex:none"></canvas>
+          <div>
+            <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Point at start</div>
+            <div style="font-size:12px;font-weight:800;text-transform:uppercase">{{ aName }}</div>
+          </div>
+        </div>
+        <div onClick="{{ editB }}" style="flex:1;border:2px solid {{ bBorder }};padding:10px;cursor:pointer;display:flex;align-items:center;gap:10px">
+          <canvas ref="{{ previewBRef }}" style="width:34px;height:34px;flex:none"></canvas>
+          <div>
+            <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">Point at end</div>
+            <div style="font-size:12px;font-weight:800;text-transform:uppercase">{{ bName }}</div>
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{ pointStudio }}" hint-placeholder-val="{{ false }}">
+        <div style="border-top:1px solid var(--color-divider);padding-top:14px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-right:auto">Design the point — {{ editingName }}</span>
+            <span onClick="{{ copyAtoB }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Match both</span>
+            <span onClick="{{ closeStudio }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Close</span>
+          </div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <canvas ref="{{ studioRef }}" style="width:96px;height:96px;flex:none;background:var(--color-bg);border:1px solid var(--color-divider)"></canvas>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px">
+              <sc-for list="{{ pointSliders }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline">
+                    <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">{{ s.label }}</span>
+                    <span style="font-size:10px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ s.display }}</span>
+                  </div>
+                  <div onPointerDown="{{ s.onDown }}" style="position:relative;height:24px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+                    <div style="height:2px;width:100%;background:var(--color-divider)"></div>
+                    <div style="position:absolute;left:0;top:11px;height:2px;background:var(--color-accent);width:{{ s.pct }}"></div>
+                    <div style="position:absolute;top:2px;width:20px;height:20px;background:var(--color-accent);left:{{ s.pct }};margin-left:-10px"></div>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="display:flex;gap:8px">
+                <span onClick="{{ toggleFill }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:8px 10px;cursor:pointer;background:{{ fillBg }};color:{{ fillFg }}">{{ fillLabel }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="display:flex;flex-direction:column;gap:13px;padding-top:12px;border-top:1px solid var(--color-divider)">
+        <sc-for list="{{ charSliders }}" as="s" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">{{ s.label }}</span>
+              <span style="font-size:10px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ s.display }}</span>
+            </div>
+            <div onPointerDown="{{ s.onDown }}" style="position:relative;height:26px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+              <div style="height:2px;width:100%;background:var(--color-divider)"></div>
+              <div style="position:absolute;left:0;top:12px;height:2px;background:var(--color-accent);width:{{ s.pct }}"></div>
+              <div style="position:absolute;top:2px;width:22px;height:22px;background:var(--color-accent);left:{{ s.pct }};margin-left:-11px"></div>
+            </div>
+          </div>
+        </sc-for>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span onClick="{{ toggleFollow }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:9px 11px;cursor:pointer;background:{{ followBg }};color:{{ followFg }}">Follow direction</span>
+          <span onClick="{{ toggleColor }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:9px 11px;cursor:pointer;background:{{ colorBg }};color:{{ colorFg }}">{{ colorLabel }}</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ repeatPanel }}" hint-placeholder-val="{{ false }}">
+    <div style="border-top:2px solid var(--color-divider);background:var(--color-surface);padding:14px 16px 16px;max-height:46dvh;overflow:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-right:auto" data-panel="repeat">Repeat and transform</span>
+        <span onClick="{{ fitView }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Fit</span>
+        <span onClick="{{ fillPattern }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer;background:{{ fillBg2 }};color:{{ fillFg2 }}">Fill pattern</span>
+        <span onClick="{{ toggleGroup }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer;background:{{ groupBg }};color:{{ groupFg }}">Group</span>
+        <span onClick="{{ closePanel }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Done</span>
+      </div>
+      <div style="font-size:11px;margin-bottom:14px;color:color-mix(in srgb, var(--color-text) 60%, transparent);text-wrap:pretty">{{ repeatHint }}</div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <sc-for list="{{ repSliders }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">{{ s.label }}</span>
+              <span style="font-size:10px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ s.display }}</span>
+            </div>
+            <div onPointerDown="{{ s.onDown }}" style="position:relative;height:26px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+              <div style="height:2px;width:100%;background:var(--color-divider)"></div>
+              <div style="position:absolute;left:0;top:12px;height:2px;background:var(--color-accent);width:{{ s.pct }}"></div>
+              <div style="position:absolute;top:2px;width:22px;height:22px;background:var(--color-accent);left:{{ s.pct }};margin-left:-11px"></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--color-divider)">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">Change across the copies</div>
+        <sc-if value="{{ predictOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="border:2px solid var(--color-accent);padding:12px">
+            <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);margin-bottom:5px">Predict first</div>
+            <div style="font-size:14px;font-weight:800;line-height:1.2;text-wrap:pretty">If every copy turns and grows a little more than the one before, what will the pattern do?</div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:11px">
+              <sc-for list="{{ guesses }}" as="g" hint-placeholder-count="4">
+                <span onClick="{{ g.onPick }}" style="min-height:44px;display:flex;align-items:center;padding:0 11px;border:1px solid var(--color-divider);cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase">{{ g.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ predictMade }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:color-mix(in srgb, var(--color-text) 60%, transparent)">
+              <span style="flex:1;min-width:0">You predicted: {{ guessLabel }} — now move the sliders and watch.</span>
+              <span onClick="{{ reopenPredict }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent);cursor:pointer;padding:8px 0">Change</span>
+            </div>
+            <sc-for list="{{ transformSliders }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;justify-content:space-between;align-items:baseline">
+                  <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">{{ s.label }}</span>
+                  <span style="font-size:10px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ s.display }}</span>
+                </div>
+                <div onPointerDown="{{ s.onDown }}" style="position:relative;height:26px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+                  <div style="height:2px;width:100%;background:var(--color-divider)"></div>
+                  <div style="position:absolute;left:0;top:12px;height:2px;background:var(--color-accent);width:{{ s.pct }}"></div>
+                  <div style="position:absolute;top:2px;width:22px;height:22px;background:var(--color-accent);left:{{ s.pct }};margin-left:-11px"></div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span onClick="{{ toggleMirror }}" style="min-height:44px;display:flex;align-items:center;padding:0 11px;border:1px solid var(--color-divider);cursor:pointer;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:{{ mirrorBg }};color:{{ mirrorFg }}">Mirror every other</span>
+              <span onClick="{{ toggleGlide }}" style="min-height:44px;display:flex;align-items:center;padding:0 11px;border:1px solid var(--color-divider);cursor:pointer;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:{{ glideBg }};color:{{ glideFg }};opacity:{{ glideOpacity }}">Slide the mirrored ones</span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ arrangePanel }}" hint-placeholder-val="{{ false }}">
+    <div style="border-top:2px solid var(--color-divider);background:var(--color-surface);padding:14px 16px 16px;max-height:48dvh;overflow:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-right:auto">Arrange the motif</span>
+        <span onClick="{{ fitView }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Fit</span>
+        <span onClick="{{ closePanel }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Done</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:16px">
+        <div onClick="{{ pickLinear }}" style="cursor:pointer;border:2px solid {{ linearBorder }};padding:8px 8px 6px;display:flex;flex-direction:column;gap:7px;align-items:flex-start">
+          <svg width="100%" viewBox="0 0 40 26" fill="currentColor"><rect x="2" y="10" width="6" height="6"></rect><rect x="12" y="10" width="6" height="6"></rect><rect x="22" y="10" width="6" height="6"></rect><rect x="32" y="10" width="6" height="6"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Row</span>
+        </div>
+        <div onClick="{{ pickGrid }}" style="cursor:pointer;border:2px solid {{ gridBorder }};padding:8px 8px 6px;display:flex;flex-direction:column;gap:7px;align-items:flex-start">
+          <svg width="100%" viewBox="0 0 40 26" fill="currentColor"><rect x="4" y="2" width="6" height="6"></rect><rect x="17" y="2" width="6" height="6"></rect><rect x="30" y="2" width="6" height="6"></rect><rect x="4" y="14" width="6" height="6"></rect><rect x="17" y="14" width="6" height="6"></rect><rect x="30" y="14" width="6" height="6"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Grid</span>
+        </div>
+        <div onClick="{{ pickBrick }}" style="cursor:pointer;border:2px solid {{ brickBorder }};padding:8px 8px 6px;display:flex;flex-direction:column;gap:7px;align-items:flex-start">
+          <svg width="100%" viewBox="0 0 40 26" fill="currentColor"><rect x="2" y="2" width="6" height="6"></rect><rect x="15" y="2" width="6" height="6"></rect><rect x="28" y="2" width="6" height="6"></rect><rect x="8" y="14" width="6" height="6"></rect><rect x="21" y="14" width="6" height="6"></rect><rect x="34" y="14" width="6" height="6"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Brick</span>
+        </div>
+        <div onClick="{{ pickRadial }}" style="cursor:pointer;border:2px solid {{ radialBorder }};padding:8px 8px 6px;display:flex;flex-direction:column;gap:7px;align-items:flex-start">
+          <svg width="100%" viewBox="0 0 40 26" fill="currentColor"><rect x="17" y="1" width="6" height="6"></rect><rect x="17" y="19" width="6" height="6"></rect><rect x="5" y="10" width="6" height="6"></rect><rect x="29" y="10" width="6" height="6"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Radial</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <sc-for list="{{ arrangeSliders }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">{{ s.label }}</span>
+              <span style="font-size:10px;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ s.display }}</span>
+            </div>
+            <div onPointerDown="{{ s.onDown }}" style="position:relative;height:26px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+              <div style="height:2px;width:100%;background:var(--color-divider)"></div>
+              <div style="position:absolute;left:0;top:12px;height:2px;background:var(--color-accent);width:{{ s.pct }}"></div>
+              <div style="position:absolute;top:2px;width:22px;height:22px;background:var(--color-accent);left:{{ s.pct }};margin-left:-11px"></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ comparePanel }}" hint-placeholder-val="{{ false }}">
+    <div style="border-top:2px solid var(--color-divider);background:var(--color-surface);padding:14px 16px 16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-right:auto">The trail of one movement</span>
+        <span onClick="{{ closePanel }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Done</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <canvas ref="{{ cmp1Ref }}" style="width:100%;aspect-ratio:1;background:var(--color-bg);border:1px solid var(--color-divider)"></canvas>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Movement</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <canvas ref="{{ cmp2Ref }}" style="width:100%;aspect-ratio:1;background:var(--color-bg);border:1px solid var(--color-divider)"></canvas>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Line</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <canvas ref="{{ cmp3Ref }}" style="width:100%;aspect-ratio:1;background:var(--color-bg);border:2px solid var(--color-accent)"></canvas>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent)">Motif</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <canvas ref="{{ cmp4Ref }}" style="width:100%;aspect-ratio:1;background:var(--color-bg);border:1px solid var(--color-divider)"></canvas>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Pattern</span>
+        </div>
+      </div>
+      <div style="font-size:11px;margin-top:12px;color:color-mix(in srgb, var(--color-text) 60%, transparent);text-wrap:pretty">{{ compareNote }}</div>
+    </div>
+  </sc-if>
+
+  <div style="border-top:2px solid var(--color-divider);background:var(--color-bg);padding:10px 12px;display:flex;align-items:stretch;gap:8px;min-height:64px">
+    <sc-if value="{{ emptyBar }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:8px;width:100%">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent);margin-right:auto;animation:lePulse 2.4s ease-in-out infinite">Draw</span>
+        <span onClick="{{ undo }}" style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid var(--color-divider);cursor:pointer;opacity:{{ undoOpacity }}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5"></path><path d="M4 9h11a5 5 0 0 1 0 10h-4"></path></svg>
+        </span>
+        <span onClick="{{ redo }}" style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid var(--color-divider);cursor:pointer;opacity:{{ redoOpacity }}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 14 5-5-5-5"></path><path d="M20 9H9a5 5 0 0 0 0 10h4"></path></svg>
+        </span>
+        <span onClick="{{ clearAll }}" style="min-height:44px;display:flex;align-items:center;padding:0 12px;border:1px solid var(--color-divider);cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Clear</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ lineBar }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:stretch;gap:6px;width:100%;overflow-x:auto">
+        <span onClick="{{ replay }}" style="flex:1;min-width:58px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 8px;border:1px solid var(--color-divider);cursor:pointer;background:{{ replayBg }};color:{{ replayFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Replay</span>
+        </span>
+        <span onClick="{{ openShape }}" style="flex:1;min-width:58px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 8px;border:1px solid var(--color-divider);cursor:pointer;background:{{ pointsBg }};color:{{ pointsFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c5 0 6-10 11-10 3 0 4 2 7 2"></path><rect x="1" y="15" width="4" height="4" fill="currentColor" stroke="none"></rect><rect x="12" y="5" width="4" height="4" fill="currentColor" stroke="none"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Edit line</span>
+        </span>
+        <span onClick="{{ openCharacter }}" style="flex:1;min-width:66px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 8px;border:1px solid var(--color-divider);cursor:pointer;background:{{ charBg }};color:{{ charFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"></path><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"></circle><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"></circle><circle cx="7" cy="18" r="2" fill="currentColor" stroke="none"></circle></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Character</span>
+        </span>
+        <span onClick="{{ deleteLine }}" style="min-width:48px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 8px;border:1px solid var(--color-divider);cursor:pointer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Delete</span>
+        </span>
+        <span onClick="{{ makeMotif }}" style="min-width:104px;min-height:44px;display:flex;align-items:center;padding:0 14px;background:var(--color-accent);color:var(--color-bg);cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Make motif</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ motifBar }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:stretch;gap:6px;width:100%;overflow-x:auto">
+        <span onClick="{{ openRepeat }}" style="min-width:64px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ repBg }};color:{{ repFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 2 4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Repeat</span>
+        </span>
+        <span onClick="{{ openArrange }}" style="min-width:70px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ arrangeBg }};color:{{ arrangeFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="5" height="5"></rect><rect x="16" y="3" width="5" height="5"></rect><rect x="3" y="16" width="5" height="5"></rect><rect x="16" y="16" width="5" height="5"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Arrange</span>
+        </span>
+        <span onClick="{{ showDetail }}" style="min-width:58px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ detailBg }};color:{{ detailFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M9 9h6v6H9z"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Detail</span>
+        </span>
+        <span onClick="{{ showOverview }}" style="min-width:68px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ overviewBg }};color:{{ overviewFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M7 7h3v3H7zM14 7h3v3h-3zM7 14h3v3H7zM14 14h3v3h-3z" fill="currentColor" stroke="none"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Overview</span>
+        </span>
+        <span onClick="{{ openCharacter }}" style="min-width:72px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ charBg }};color:{{ charFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"></path><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"></circle><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"></circle><circle cx="7" cy="18" r="2" fill="currentColor" stroke="none"></circle></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Character</span>
+        </span>
+        <span onClick="{{ openShape }}" style="min-width:62px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ pointsBg }};color:{{ pointsFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c5 0 6-10 11-10 3 0 4 2 7 2"></path><rect x="1" y="15" width="4" height="4" fill="currentColor" stroke="none"></rect><rect x="12" y="5" width="4" height="4" fill="currentColor" stroke="none"></rect></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Edit line</span>
+        </span>
+        <span onClick="{{ openCompare }}" style="min-width:68px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ compareBg }};color:{{ compareFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M20 4v16M9 12h6"></path><path d="m12 9-3 3 3 3"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Compare</span>
+        </span>
+        <span onClick="{{ replay }}" style="min-width:58px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer;background:{{ replayBg }};color:{{ replayFg }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Replay</span>
+        </span>
+        <span onClick="{{ deleteLine }}" style="min-width:48px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 9px;border:1px solid var(--color-divider);cursor:pointer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Delete</span>
+        </span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ shapeBar }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:stretch;gap:6px;width:100%">
+        <span onClick="{{ removePoint }}" style="flex:1;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 10px;border:1px solid var(--color-divider);cursor:pointer;opacity:{{ removeOpacity }}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Remove point</span>
+        </span>
+        <span onClick="{{ toggleMovement }}" style="flex:1;min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 10px;border:1px solid var(--color-divider);cursor:pointer;background:{{ movementBg }};color:{{ movementFg }}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"><path d="M2 16c6 0 6-8 12-8 4 0 5 3 8 3"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">My movement</span>
+        </span>
+        <span onClick="{{ resetShape }}" style="min-height:44px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 10px;border:1px solid var(--color-divider);cursor:pointer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg>
+          <span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Reset</span>
+        </span>
+        <span onClick="{{ closeShape }}" style="min-height:44px;display:flex;align-items:center;padding:0 14px;background:var(--color-accent);color:var(--color-bg);cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Done</span>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeMenu }}" style="position:fixed;inset:0;background:color-mix(in srgb, var(--color-neutral-900) 45%, transparent);display:flex;align-items:flex-end">
+      <div style="width:100%;background:var(--color-surface);border-top:2px solid var(--color-text);padding:16px">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:12px">Session</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span onClick="{{ finish }}" style="min-height:52px;display:flex;align-items:center;padding:0 14px;background:var(--color-accent);color:var(--color-bg);cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:{{ finishOpacity }}">Finish and save</span>
+          <span onClick="{{ clearAll }}" style="min-height:52px;display:flex;align-items:center;padding:0 14px;border:1px solid var(--color-divider);cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Clear the workspace</span>
+          <span onClick="{{ toggleLevel }}" style="min-height:52px;display:flex;align-items:center;padding:0 14px;border:1px solid var(--color-divider);cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">{{ levelSwitchLabel }}</span>
+          <span onClick="{{ closeMenu }}" style="min-height:52px;display:flex;align-items:center;padding:0 14px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent)">Keep exploring</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ exportOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:color-mix(in srgb, var(--color-neutral-900) 60%, transparent);display:flex;align-items:flex-end;padding:0">
+      <div style="width:100%;background:var(--color-surface);border-top:2px solid var(--color-text);padding:16px">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+          <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-right:auto">Your exploration</span>
+          <span onClick="{{ closeExport }}" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--color-divider);padding:7px 10px;cursor:pointer">Back</span>
+        </div>
+        <div style="border:1px solid var(--color-divider);background:var(--color-bg);margin-bottom:14px">
+          <img ref="{{ exportImgRef }}" alt="Line exploration" style="width:100%;display:block;min-height:120px">
+        </div>
+        <div style="font-size:11px;margin-bottom:14px;color:color-mix(in srgb, var(--color-text) 60%, transparent)">{{ exportNote }}</div>
+        <div style="display:flex;gap:8px">
+          <a href="{{ exportURL }}" download="line-exploration.png" style="flex:1;min-height:48px;display:flex;align-items:center;padding:0 14px;background:var(--color-accent);color:var(--color-bg);text-decoration:none;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Save PNG</a>
+          <span onClick="{{ closeExport }}" style="min-height:48px;display:flex;align-items:center;padding:0 14px;border:1px solid var(--color-divider);cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Keep exploring</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:932},&quot;showGrid&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;invite&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;startLevel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;free&quot;,&quot;task&quot;],&quot;default&quot;:&quot;free&quot;,&quot;tsType&quot;:&quot;'free' | 'task'&quot;}}">
+const TASKS = [
+  "Make a line that feels slow.",
+  "Make a line that holds tension.",
+  "Make a line that changes gradually from start to end.",
+  "Build a pattern from one single line.",
+  "Find a rhythm using spacing alone."
+];
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+class Component extends DCLogic {
+  canvasRef = React.createRef();
+  surfaceRef = React.createRef();
+  previewARef = React.createRef();
+  previewBRef = React.createRef();
+  studioRef = React.createRef();
+  exportImgRef = React.createRef();
+  cmp1Ref = React.createRef();
+  cmp2Ref = React.createRef();
+  cmp3Ref = React.createRef();
+  cmp4Ref = React.createRef();
+
+  state = {
+    stroke: null,
+    drawing: false,
+    selected: false,
+    panel: null,
+    editing: null,
+    shapeMode: false,
+    nodes: null,
+    sel: null,
+    showMovement: false,
+    menuOpen: false,
+    replaying: false,
+    grouped: false,
+    exportOpen: false,
+    exportURL: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+    level: null,
+    task: 0,
+    char: { density: 0.55, size: 13, sizeEnd: 13, variation: 0.45, smooth: 0.35, transition: 0.5, weight: 2, follow: false, red: false },
+    A: { sides: 14, rot: 0, squash: 1, filled: true },
+    B: { sides: 14, rot: 0, squash: 1, filled: true },
+    rep: { count: 1, step: 74, angle: 90, drift: 0, rotDrift: 0, scaleDrift: 0, mirror: false, glide: false },
+    motif: false,
+    arrangement: "linear",
+    patternView: "detail",
+    fieldFilled: false,
+    grid: { cols: 3, rows: 3, colStep: 110, rowStep: 96, offset: 0.5 },
+    radial: { count: 8, radius: 120, face: true },
+    predict: { asked: false, guess: null },
+    ghost: { active: false, prompt: false },
+    group: { x: 0, y: 0, rot: 0, scale: 1 },
+    canUndo: false,
+    canRedo: false
+  };
+
+  history = [];
+  future = [];
+  live = null;
+  pointers = new Map();
+  raf = null;
+  t0 = 0;
+
+  componentDidMount() {
+    const cs = getComputedStyle(document.documentElement);
+    this.ink = (cs.getPropertyValue("--color-text") || "#201e1d").trim();
+    this.accent = (cs.getPropertyValue("--color-accent") || "#ec3013").trim();
+    this.bg = (cs.getPropertyValue("--color-bg") || "#f3f2f2").trim();
+    this.ro = new ResizeObserver(() => this.draw());
+    if (this.canvasRef.current) this.ro.observe(this.canvasRef.current);
+    this.t0 = performance.now();
+    this.loop();
+    this.draw();
+  }
+  componentDidUpdate() {
+    this.draw();
+    if (this.exportImgRef.current && this.state.exportURL) this.exportImgRef.current.src = this.state.exportURL;
+    if (this.state.panel === "compare") {
+      this.drawCell(this.cmp1Ref, "movement");
+      this.drawCell(this.cmp2Ref, "line");
+      this.drawCell(this.cmp3Ref, "motif");
+      this.drawCell(this.cmp4Ref, "pattern");
+    }
+    if (this.state.panel === "character") {
+      this.drawPreview(this.previewARef, this.state.A, 24);
+      this.drawPreview(this.previewBRef, this.state.B, 24);
+      if (this.state.editing) this.drawPreview(this.studioRef, this.state[this.state.editing], 62);
+    }
+  }
+  componentWillUnmount() {
+    if (this.ro) this.ro.disconnect();
+    if (this.raf) cancelAnimationFrame(this.raf);
+  }
+
+  loop = () => {
+    this.raf = requestAnimationFrame(this.loop);
+    if (this.state.replaying || this.live || (!this.state.stroke && this.props.invite !== false)) this.draw();
+  };
+
+  /* ── geometry ───────────────────────────────────────────── */
+  smoothed(pts) {
+    const w = 1 + Math.round(this.state.char.smooth * 7);
+    if (w < 2) return pts;
+    return pts.map((p, i) => {
+      let x = 0, y = 0, n = 0;
+      for (let j = i - w; j <= i + w; j++) { const q = pts[clamp(j, 0, pts.length - 1)]; x += q.x; y += q.y; n++; }
+      return { x: x / n, y: y / n, t: p.t };
+    });
+  }
+
+  autoH(nodes, i) {
+    const prev = nodes[Math.max(0, i - 1)], next = nodes[Math.min(nodes.length - 1, i + 1)];
+    return { x: (next.x - prev.x) / 6, y: (next.y - prev.y) / 6 };
+  }
+
+  designedPts(nodes) {
+    const out = [];
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const p0 = nodes[i], p1 = nodes[i + 1];
+      const h0 = p0.h || this.autoH(nodes, i), h1 = p1.h || this.autoH(nodes, i + 1);
+      const c1 = { x: p0.x + h0.x, y: p0.y + h0.y }, c2 = { x: p1.x - h1.x, y: p1.y - h1.y };
+      const steps = 18;
+      for (let k = 0; k < steps; k++) {
+        const u = k / steps, v = 1 - u;
+        out.push({
+          x: v * v * v * p0.x + 3 * v * v * u * c1.x + 3 * v * u * u * c2.x + u * u * u * p1.x,
+          y: v * v * v * p0.y + 3 * v * v * u * c1.y + 3 * v * u * u * c2.y + u * u * u * p1.y,
+          t: lerp(p0.t, p1.t, u)
+        });
+      }
+    }
+    const last = nodes[nodes.length - 1];
+    out.push({ x: last.x, y: last.y, t: last.t });
+    return out;
+  }
+
+  nodesFromStroke() {
+    const sm = this.timeSamples(this.smoothed((this.state.stroke || {}).pts || []));
+    if (sm.length < 3) return null;
+    const target = clamp(Math.round(sm.length / 4), 5, 12);
+    const nodes = [];
+    for (let i = 0; i < target; i++) {
+      const p = sm[Math.round((i * (sm.length - 1)) / (target - 1))];
+      nodes.push({ x: p.x, y: p.y, t: p.t, h: null });
+    }
+    return nodes;
+  }
+
+  pathPts() {
+    const s = this.live || this.state.stroke;
+    if (!s || s.pts.length < 3) return [];
+    if (this.state.nodes && this.state.nodes.length > 1 && !this.live) return this.designedPts(this.state.nodes);
+    return this.smoothed(s.pts);
+  }
+
+  samples() { return this.timeSamples(this.pathPts()); }
+
+  timeSamples(pts) {
+    if (!pts || pts.length < 3) return [];
+    const interval = lerp(95, 14, this.state.char.density);
+    const out = [];
+    let next = pts[0].t;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      while (p.t >= next) {
+        const prev = pts[Math.max(0, i - 1)];
+        const span = Math.max(1, p.t - prev.t);
+        const f = clamp((next - prev.t) / span, 0, 1);
+        const x = lerp(prev.x, p.x, f), y = lerp(prev.y, p.y, f);
+        const last = out[out.length - 1];
+        const dist = last ? Math.hypot(x - last.x, y - last.y) : 0;
+        out.push({ x, y, t: next, speed: dist / interval, dir: last ? Math.atan2(y - last.y, x - last.x) : 0 });
+        next += interval;
+      }
+    }
+    if (out.length) {
+      const max = Math.max(0.001, ...out.map(o => o.speed));
+      out.forEach(o => { o.sn = clamp(o.speed / max, 0, 1); });
+      out[0].dir = out.length > 1 ? out[1].dir : 0;
+    }
+    return out;
+  }
+
+  marks(useOriginal) {
+    const st = this.state.stroke;
+    const sm = useOriginal && st && !this.live ? this.timeSamples(this.smoothed(st.pts)) : this.samples();
+    const c = this.state.char, A = this.state.A, B = this.state.B;
+    const exp = lerp(2.6, 0.4, c.transition);
+    const n = Math.max(1, sm.length - 1);
+    return sm.map((p, i) => {
+      const t = i / n, tt = Math.pow(t, exp);
+      const base = lerp(c.size, c.sizeEnd, t);
+      const size = Math.max(2.5, base * (1 + c.variation * (0.45 - p.sn) * 1.5));
+      return {
+        x: p.x, y: p.y, size,
+        sides: Math.round(lerp(A.sides, B.sides, tt)),
+        rot: c.follow ? p.dir : (lerp(A.rot, B.rot, tt) * Math.PI) / 180,
+        squash: lerp(A.squash, B.squash, tt),
+        filled: tt < 0.5 ? A.filled : B.filled,
+        t
+      };
+    });
+  }
+
+  markPath(ctx, x, y, size, sides, rot, squash) {
+    const r = size / 2;
+    ctx.beginPath();
+    if (sides >= 13) {
+      ctx.ellipse(x, y, r, r * squash, rot, 0, Math.PI * 2);
+    } else {
+      for (let i = 0; i < sides; i++) {
+        const a = rot - Math.PI / 2 + (i * Math.PI * 2) / sides;
+        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * squash;
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+    }
+  }
+
+  placements() {
+    const s = this.state, rep = s.rep;
+    if (!s.motif || s.replaying) return [{ dx: 0, dy: 0, rot: 0, scale: 1, mir: false }];
+    const out = [];
+    const pw = (k) => Math.pow(1 + rep.scaleDrift, k);
+    if (s.arrangement === "linear") {
+      const rad = (rep.angle * Math.PI) / 180;
+      const px = Math.cos(rad + Math.PI / 2), py = Math.sin(rad + Math.PI / 2);
+      let dist = 0;
+      for (let k = 0; k < rep.count; k++) {
+        if (k > 0) dist += rep.step * (1 + rep.drift * k);
+        const mir = rep.mirror && k % 2 === 1;
+        const off = rep.mirror && rep.glide && k % 2 === 1 ? rep.step * 0.4 : 0;
+        out.push({ dx: Math.cos(rad) * dist + px * off, dy: Math.sin(rad) * dist + py * off, rot: rep.rotDrift * k, scale: pw(k), mir });
+      }
+      return out;
+    }
+    if (s.arrangement === "radial") {
+      const r = s.radial;
+      for (let k = 0; k < r.count; k++) {
+        const a = (k / r.count) * Math.PI * 2;
+        out.push({
+          dx: Math.cos(a) * r.radius, dy: Math.sin(a) * r.radius,
+          rot: r.face ? (a * 180) / Math.PI + 90 : rep.rotDrift * k,
+          scale: pw(k), mir: rep.mirror && k % 2 === 1
+        });
+      }
+      return out;
+    }
+    const g = s.grid;
+    const brick = s.arrangement === "brick";
+    for (let j = 0; j < g.rows; j++) {
+      for (let i = 0; i < g.cols; i++) {
+        const n = i + j;
+        out.push({
+          dx: i * g.colStep + (brick && j % 2 === 1 ? g.colStep * g.offset : 0),
+          dy: j * g.rowStep,
+          rot: rep.rotDrift * n,
+          scale: pw(n),
+          mir: rep.mirror && n % 2 === 1
+        });
+      }
+    }
+    return out;
+  }
+
+  drawMark(ctx, m, color, alpha) {
+    ctx.globalAlpha = alpha;
+    this.markPath(ctx, m.x, m.y, m.size, m.sides, m.rot, m.squash);
+    if (m.filled) { ctx.fillStyle = color; ctx.fill(); }
+    else { ctx.strokeStyle = color; ctx.lineWidth = this.state.char.weight; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ── canvas ─────────────────────────────────────────────── */
+  draw() {
+    const cv = this.canvasRef.current;
+    if (!cv) return;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const ink = this.state.char.red ? this.accent : this.ink;
+
+    if (!this.state.stroke && !this.live) { this.drawInvite(ctx, w, h); return; }
+
+    if (this.live && this.live.pts.length > 1) {
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      this.live.pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const marks = this.marks(this.state.replaying);
+    if (!marks.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    marks.forEach(m => { x0 = Math.min(x0, m.x); y0 = Math.min(y0, m.y); x1 = Math.max(x1, m.x); y1 = Math.max(y1, m.y); });
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    this.cc = { cx, cy };
+
+    const rep = this.state.rep, g = this.state.group;
+    const rad = (rep.angle * Math.PI) / 180;
+    const reveal = this.state.replaying ? clamp((performance.now() - this.replayStart) / this.replayDur, 0, 1) : 1;
+
+    ctx.save();
+    ctx.translate(cx + g.x, cy + g.y);
+    ctx.rotate((g.rot * Math.PI) / 180);
+    ctx.scale(g.scale, g.scale);
+    ctx.translate(-cx, -cy);
+
+    const places = this.placements();
+    this.lastPlaces = places;
+    places.forEach((pl, k) => {
+      ctx.save();
+      ctx.translate(pl.dx, pl.dy);
+      ctx.translate(cx, cy);
+      ctx.rotate((pl.rot * Math.PI) / 180);
+      ctx.scale(pl.scale * (pl.mir ? -1 : 1), pl.scale);
+      ctx.translate(-cx, -cy);
+      const fade = k === 0 ? 1 : 0.9;
+      marks.forEach((m, i) => {
+        const at = i / Math.max(1, marks.length - 1);
+        if (this.state.replaying) {
+          if (at > reveal) return;
+          const settle = clamp((reveal - at) * 5, 0, 1);
+          if (settle < 1) {
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = this.accent;
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, 2.5 + (1 - settle) * 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            return;
+          }
+        }
+        this.drawMark(ctx, m, ink, fade);
+      });
+      ctx.restore();
+    });
+
+    if (this.state.ghost.active && !this.state.replaying) {
+      ctx.save();
+      ctx.translate(Math.cos(rad) * rep.step, Math.sin(rad) * rep.step);
+      marks.forEach(m => this.drawMark(ctx, m, ink, 0.35));
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = this.accent;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(rad) * rep.step, cy + Math.sin(rad) * rep.step);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (this.state.showMovement && this.state.stroke) {
+      const orig = this.smoothed(this.state.stroke.pts);
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = this.ink;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 5]);
+      ctx.beginPath();
+      orig.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (this.state.shapeMode && !this.state.replaying) {
+      const nodes = this.state.nodes || [];
+      const path = nodes.length > 1 ? this.designedPts(nodes) : [];
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = this.accent;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      nodes.forEach((nd, i) => {
+        const isSel = this.state.sel === i;
+        if (isSel) {
+          const h = nd.h || this.autoH(nodes, i);
+          ctx.strokeStyle = this.accent;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(nd.x - h.x * 2, nd.y - h.y * 2);
+          ctx.lineTo(nd.x + h.x * 2, nd.y + h.y * 2);
+          ctx.stroke();
+          [[-1], [1]].forEach(([sg]) => {
+            ctx.fillStyle = this.bg;
+            ctx.strokeStyle = this.accent;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(nd.x + h.x * 2 * sg, nd.y + h.y * 2 * sg, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          });
+        }
+        const s2 = isSel ? 8 : 5.5;
+        ctx.fillStyle = isSel ? this.accent : this.bg;
+        ctx.strokeStyle = this.accent;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(nd.x - s2, nd.y - s2, s2 * 2, s2 * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    if (this.state.replaying) {
+      const head = marks[Math.min(marks.length - 1, Math.floor(reveal * (marks.length - 1)))];
+      ctx.fillStyle = this.accent;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      if (reveal >= 1) this.setState({ replaying: false });
+    }
+    ctx.restore();
+
+    if (this.state.grouped && !this.state.replaying) {
+      const pad = 16;
+      ctx.save();
+      ctx.translate(cx + g.x, cy + g.y);
+      ctx.rotate((g.rot * Math.PI) / 180);
+      ctx.scale(g.scale, g.scale);
+      ctx.translate(-cx, -cy);
+      let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+      places.forEach(pl => {
+        bx0 = Math.min(bx0, x0 + pl.dx); by0 = Math.min(by0, y0 + pl.dy);
+        bx1 = Math.max(bx1, x1 + pl.dx); by1 = Math.max(by1, y1 + pl.dy);
+      });
+      bx0 -= pad; by0 -= pad; bx1 += pad; by1 += pad;
+      ctx.strokeStyle = this.accent;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 6]);
+      ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+      ctx.setLineDash([]);
+      [[bx0, by0], [bx1, by0], [bx0, by1], [bx1, by1]].forEach(([px, py]) => {
+        ctx.fillStyle = this.accent;
+        ctx.fillRect(px - 5, py - 5, 10, 10);
+      });
+      ctx.restore();
+    }
+  }
+
+  drawInvite(ctx, w, h) {
+    if (this.props.invite === false) return;
+    const T = ((performance.now() - this.t0) % 5200) / 5200;
+    ctx.globalAlpha = 0.16;
+    const n = 46;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      if (t > T) break;
+      const x = w * 0.14 + t * w * 0.72;
+      const y = h * 0.42 + Math.sin(t * Math.PI * 2.4) * h * 0.13;
+      ctx.fillStyle = this.ink;
+      ctx.beginPath();
+      ctx.arc(x, y, 4 + Math.sin(t * 7) * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawCell(ref, kind) {
+    const cv = ref.current;
+    if (!cv) return;
+    const w = cv.clientWidth, h = cv.clientHeight || cv.clientWidth;
+    if (!w) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const marks = this.marks(kind === "movement");
+    if (!marks.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    marks.forEach(m => { x0 = Math.min(x0, m.x); y0 = Math.min(y0, m.y); x1 = Math.max(x1, m.x); y1 = Math.max(y1, m.y); });
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    const places = kind === "pattern" ? this.placements() : [{ dx: 0, dy: 0, rot: 0, scale: 1, mir: false }];
+    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    places.forEach(pl => {
+      bx0 = Math.min(bx0, x0 + pl.dx); by0 = Math.min(by0, y0 + pl.dy);
+      bx1 = Math.max(bx1, x1 + pl.dx); by1 = Math.max(by1, y1 + pl.dy);
+    });
+    const pad = 12;
+    const k = Math.min((w - pad) / Math.max(1, bx1 - bx0), (h - pad) / Math.max(1, by1 - by0));
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(k, k);
+    ctx.translate(-(bx0 + bx1) / 2, -(by0 + by1) / 2);
+    const ink = this.state.char.red ? this.accent : this.ink;
+    if (kind === "movement") {
+      const orig = this.smoothed(this.state.stroke.pts);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1.5 / k;
+      ctx.beginPath();
+      orig.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.stroke();
+      marks.forEach(m => {
+        ctx.fillStyle = this.accent;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 2 / k, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      return;
+    }
+    places.forEach(pl => {
+      ctx.save();
+      ctx.translate(pl.dx, pl.dy);
+      ctx.translate(cx, cy);
+      ctx.rotate((pl.rot * Math.PI) / 180);
+      ctx.scale(pl.scale * (pl.mir ? -1 : 1), pl.scale);
+      ctx.translate(-cx, -cy);
+      marks.forEach(m => this.drawMark(ctx, m, ink, 1));
+      ctx.restore();
+    });
+    if (kind === "motif") {
+      ctx.strokeStyle = this.accent;
+      ctx.lineWidth = 1 / k;
+      ctx.setLineDash([4 / k, 4 / k]);
+      ctx.strokeRect(x0 - 6, y0 - 6, x1 - x0 + 12, y1 - y0 + 12);
+    }
+  }
+
+  drawPreview(ref, pt, size) {
+    const cv = ref.current;
+    if (!cv) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w) return;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const m = { x: w / 2, y: h / 2, size: size, sides: pt.sides, rot: (pt.rot * Math.PI) / 180, squash: pt.squash, filled: pt.filled };
+    this.drawMark(ctx, m, this.state.char.red ? this.accent : this.ink, 1);
+  }
+
+  /* ── input ──────────────────────────────────────────────── */
+  local(e) {
+    const r = this.surfaceRef.current.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  fitView = () => {
+    const cv = this.canvasRef.current;
+    const marks = this.marks(false);
+    if (!cv || !marks.length) return;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    marks.forEach(m => { x0 = Math.min(x0, m.x - m.size); y0 = Math.min(y0, m.y - m.size); x1 = Math.max(x1, m.x + m.size); y1 = Math.max(y1, m.y + m.size); });
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    this.placements().forEach(pl => {
+      bx0 = Math.min(bx0, x0 + pl.dx); by0 = Math.min(by0, y0 + pl.dy);
+      bx1 = Math.max(bx1, x1 + pl.dx); by1 = Math.max(by1, y1 + pl.dy);
+    });
+    const S = clamp(Math.min(w / Math.max(1, bx1 - bx0), h / Math.max(1, by1 - by0)) * 0.86, 0.15, 2.4);
+    const bcx = (bx0 + bx1) / 2, bcy = (by0 + by1) / 2;
+    this.setState({ group: { x: w / 2 - cx - S * (bcx - cx), y: h / 2 - cy - S * (bcy - cy), rot: 0, scale: S } });
+  };
+
+  fillPattern = () => {
+    const cv = this.canvasRef.current;
+    if (!cv) return;
+    const s = this.state, w = cv.clientWidth || 360, h = cv.clientHeight || 520;
+    const span = Math.max(w, h) * 3;
+    let next = { fieldFilled: true, patternView: "overview", grouped: false };
+    if (s.arrangement === "linear") {
+      next.rep = { ...s.rep, count: clamp(Math.ceil(span / Math.max(12, s.rep.step)) + 1, 3, 60) };
+    } else if (s.arrangement === "radial") {
+      next.radial = { ...s.radial, count: clamp(Math.round(Math.max(12, span / Math.max(48, s.radial.radius / 2))), 8, 24) };
+    } else {
+      next.grid = {
+        ...s.grid,
+        cols: clamp(Math.ceil((w * 2.4) / Math.max(30, s.grid.colStep)) + 1, 2, 16),
+        rows: clamp(Math.ceil((h * 2.4) / Math.max(30, s.grid.rowStep)) + 1, 2, 16)
+      };
+    }
+    this.setState(next, this.fitView);
+  };
+
+  setPatternView = (patternView) => {
+    if (patternView === "overview") this.setState({ patternView, grouped: false }, this.fitView);
+    else this.setState({ patternView, grouped: false, group: { x: 0, y: 0, rot: 0, scale: 1 } });
+  };
+
+  setGhostFrom(p) {
+    const c = this.cc || { cx: p.x, cy: p.y };
+    const vx = p.x - c.cx, vy = p.y - c.cy;
+    const len = Math.hypot(vx, vy);
+    if (len < 12) return;
+    this.setState({ rep: { ...this.state.rep, step: clamp(len, 24, 420), angle: (Math.atan2(vy, vx) * 180) / Math.PI } });
+  }
+
+  inv(p) {
+    const g = this.state.group, c = this.cc;
+    if (!c || (g.x === 0 && g.y === 0 && g.rot === 0 && g.scale === 1)) return p;
+    let x = p.x - g.x - c.cx, y = p.y - g.y - c.cy;
+    const a = (-g.rot * Math.PI) / 180;
+    const rx = x * Math.cos(a) - y * Math.sin(a), ry = x * Math.sin(a) + y * Math.cos(a);
+    return { x: rx / g.scale + c.cx, y: ry / g.scale + c.cy };
+  }
+
+  nearestNode(p) {
+    const nodes = this.state.nodes || [];
+    let best = -1, bd = 26;
+    nodes.forEach((nd, i) => {
+      const d = Math.hypot(nd.x - p.x, nd.y - p.y);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+
+  handleHit(p) {
+    const i = this.state.sel;
+    const nodes = this.state.nodes || [];
+    if (i === null || !nodes[i]) return 0;
+    const nd = nodes[i], h = nd.h || this.autoH(nodes, i);
+    for (const sg of [1, -1]) {
+      if (Math.hypot(nd.x + h.x * 2 * sg - p.x, nd.y + h.y * 2 * sg - p.y) < 24) return sg;
+    }
+    return 0;
+  }
+
+  insertNode(p) {
+    const nodes = (this.state.nodes || []).slice();
+    if (nodes.length < 2) return;
+    let best = -1, bd = 26, bt = 0;
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const a = nodes[i], b = nodes[i + 1];
+      const vx = b.x - a.x, vy = b.y - a.y;
+      const len2 = vx * vx + vy * vy || 1;
+      const u = clamp(((p.x - a.x) * vx + (p.y - a.y) * vy) / len2, 0, 1);
+      const d = Math.hypot(a.x + vx * u - p.x, a.y + vy * u - p.y);
+      if (d < bd) { bd = d; best = i; bt = u; }
+    }
+    if (best < 0) return;
+    this.pushHistory();
+    nodes.splice(best + 1, 0, { x: p.x, y: p.y, t: lerp(nodes[best].t, nodes[best + 1].t, bt), h: null });
+    this.setState({ nodes, sel: best + 1, canUndo: true });
+  }
+
+  onDown = (e) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    this.pointers.set(e.pointerId, this.local(e));
+    if (this.state.shapeMode) {
+      const p = this.inv(this.local(e));
+      const hs = this.handleHit(p);
+      if (hs) { this.dragHandle = hs; this.pushHistory(); this.setState({ canUndo: true }); return; }
+      const i = this.nearestNode(p);
+      if (i >= 0) { this.dragIdx = i; this.pushHistory(); this.setState({ sel: i, canUndo: true }); return; }
+      const path = this.designedPts(this.state.nodes || []);
+      let near = 999;
+      path.forEach(q => { near = Math.min(near, Math.hypot(q.x - p.x, q.y - p.y)); });
+      if (near < 22) { this.insertNode(p); return; }
+      this.setState({ sel: null });
+      return;
+    }
+    if (this.state.ghost.active) {
+      this.ghostDrag = true;
+      this.setGhostFrom(this.local(e));
+      return;
+    }
+    if (this.state.grouped || (this.state.motif && this.state.patternView === "detail" && !this.state.panel)) {
+      this.fieldPan = !this.state.grouped;
+      this.gStart = { ...this.state.group };
+      if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        this.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), a: Math.atan2(b.y - a.y, b.x - a.x) };
+      }
+      this.dragFrom = this.local(e);
+      return;
+    }
+    if (this.state.motif) return;
+    if (this.state.panel) return;
+    this.pushHistory();
+    this.live = { pts: [{ ...this.local(e), t: 0 }] };
+    this.liveT0 = performance.now();
+    this.setState({ drawing: true, selected: false, replaying: false, nodes: null, sel: null, shapeMode: false, motif: false, patternView: "detail", fieldFilled: false, grouped: false, ghost: { active: false, prompt: false }, group: { x: 0, y: 0, rot: 0, scale: 1 }, rep: { ...this.state.rep, count: 1 } });
+  };
+
+  onMove = (e) => {
+    if (!this.pointers.has(e.pointerId)) return;
+    const p = this.local(e);
+    this.pointers.set(e.pointerId, p);
+    if (this.state.shapeMode) {
+      const q = this.inv(p);
+      const nodes = (this.state.nodes || []).slice();
+      if (this.dragHandle) {
+        const i = this.state.sel;
+        if (nodes[i]) {
+          const sg = this.dragHandle;
+          nodes[i] = { ...nodes[i], h: { x: ((q.x - nodes[i].x) / 2) * sg, y: ((q.y - nodes[i].y) / 2) * sg } };
+          this.setState({ nodes });
+        }
+        return;
+      }
+      if (this.dragIdx != null && nodes[this.dragIdx]) {
+        nodes[this.dragIdx] = { ...nodes[this.dragIdx], x: q.x, y: q.y };
+        this.setState({ nodes });
+      }
+      return;
+    }
+    if (this.ghostDrag) { this.setGhostFrom(p); return; }
+    if ((this.state.grouped || this.fieldPan) && this.gStart) {
+      if (this.pointers.size === 2 && this.pinch) {
+        const [a, b] = [...this.pointers.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const ang = Math.atan2(b.y - a.y, b.x - a.x);
+        this.setState({ group: { ...this.gStart, scale: clamp(this.gStart.scale * (d / this.pinch.d), 0.3, 2.4), rot: this.gStart.rot + ((ang - this.pinch.a) * 180) / Math.PI } });
+      } else if (this.dragFrom) {
+        this.setState({ group: { ...this.gStart, x: this.gStart.x + p.x - this.dragFrom.x, y: this.gStart.y + p.y - this.dragFrom.y } });
+      }
+      return;
+    }
+    if (!this.live) return;
+    this.live.pts.push({ ...p, t: performance.now() - this.liveT0 });
+  };
+
+  onUp = (e) => {
+    this.pointers.delete(e.pointerId);
+    if (this.state.shapeMode) { this.dragIdx = null; this.dragHandle = 0; return; }
+    if (this.ghostDrag) {
+      this.ghostDrag = false;
+      this.setState({ ghost: { active: true, prompt: true } });
+      return;
+    }
+    if (this.state.grouped || this.fieldPan) { this.fieldPan = false; this.pinch = null; this.gStart = null; this.dragFrom = null; return; }
+    if (!this.live) return;
+    const s = this.live;
+    this.live = null;
+    if (s.pts.length < 4) { this.history.pop(); this.setState({ drawing: false, selected: !!this.state.stroke }); return; }
+    this.setState({ stroke: s, drawing: false, selected: true, canUndo: true, canRedo: false });
+    this.future = [];
+  };
+
+  /* ── history ────────────────────────────────────────────── */
+  snapshot() {
+    const s = this.state;
+    return { stroke: s.stroke, nodes: s.nodes ? s.nodes.map(n => ({ ...n })) : null, sel: s.sel, char: { ...s.char }, A: { ...s.A }, B: { ...s.B }, rep: { ...s.rep }, group: { ...s.group }, motif: s.motif, arrangement: s.arrangement, patternView: s.patternView, fieldFilled: s.fieldFilled, grid: { ...s.grid }, radial: { ...s.radial } };
+  }
+  pushHistory() { this.history.push(this.snapshot()); if (this.history.length > 20) this.history.shift(); }
+  undo = () => {
+    if (!this.history.length) return;
+    this.future.push(this.snapshot());
+    const s = this.history.pop();
+    this.setState({ ...s, selected: !!s.stroke, panel: null, canUndo: this.history.length > 0, canRedo: true });
+  };
+  redo = () => {
+    if (!this.future.length) return;
+    this.history.push(this.snapshot());
+    const s = this.future.pop();
+    this.setState({ ...s, selected: !!s.stroke, canUndo: true, canRedo: this.future.length > 0 });
+  };
+
+  /* ── slider plumbing ────────────────────────────────────── */
+  setVal(target, key, v) {
+    this.setState(st => ({ [target]: { ...st[target], [key]: v } }));
+  }
+  slide(e, spec) {
+    const track = e.currentTarget;
+    const rect = track.getBoundingClientRect();
+    const apply = (clientX) => {
+      const pct = clamp((clientX - rect.left) / rect.width, 0, 1);
+      let v = lerp(spec.min, spec.max, pct);
+      if (spec.int) v = Math.round(v);
+      this.setVal(spec.target, spec.key, v);
+    };
+    apply(e.clientX);
+    const move = (ev) => apply(ev.clientX);
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+  mkSlider(target, key, label, min, max, opts) {
+    const o = opts || {};
+    const obj = this.state[target] || {};
+    const v = obj[key];
+    const pct = clamp((v - min) / (max - min), 0, 1);
+    return {
+      label,
+      display: o.fmt ? o.fmt(v) : String(Math.round(v)),
+      pct: (pct * 100).toFixed(1) + "%",
+      onDown: (e) => this.slide(e, { target, key, min, max, int: o.int })
+    };
+  }
+
+  pointName(p) {
+    if (p.sides >= 13) return p.squash < 0.75 ? "Oval" : "Circle";
+    if (p.sides === 3) return "Triangle";
+    if (p.sides === 4) return p.squash < 0.75 ? "Bar" : "Square";
+    return p.sides + "-sided";
+  }
+
+  renderVals() {
+    const s = this.state;
+    const c = s.char;
+    const level = s.level || this.props.startLevel || "free";
+    const challengeOn = level === "task";
+    const patterned = s.motif && (s.arrangement !== "linear" || s.rep.count > 1);
+    const varied = patterned && (s.rep.rotDrift !== 0 || s.rep.scaleDrift !== 0 || s.rep.drift !== 0 || s.rep.mirror || s.arrangement === "radial" || s.arrangement === "brick");
+    const stageIdx = !s.stroke ? 0 : varied ? 4 : patterned ? 3 : s.motif ? 2 : 1;
+    const stageLabels = ["Movement", "Line", "Motif", "Repeat", "Pattern"];
+    const editing = s.editing ? s[s.editing] : null;
+    const on = { bg: this.accent || "var(--color-accent)", fg: "var(--color-bg)" };
+    const off = { bg: "transparent", fg: "var(--color-text)" };
+    const pick = (b) => (b ? on : off);
+
+    const charSliders = [
+      this.mkSlider("char", "density", "Point density", 0, 1, { fmt: v => (v < 0.33 ? "sparse" : v < 0.7 ? "even" : "crowded") }),
+      this.mkSlider("char", "size", "Size at start", 3, 42),
+      this.mkSlider("char", "sizeEnd", "Size at end", 3, 42),
+      this.mkSlider("char", "variation", "Speed influence", 0, 1, { fmt: v => Math.round(v * 100) + "%" }),
+      this.mkSlider("char", "smooth", "Smoothness", 0, 1, { fmt: v => (v < 0.2 ? "raw" : v < 0.6 ? "eased" : "calm") }),
+      this.mkSlider("char", "transition", "Transition", 0, 1, { fmt: v => (v < 0.35 ? "late" : v < 0.65 ? "gradual" : "early") }),
+      this.mkSlider("char", "weight", "Outline weight", 1, 6, { fmt: v => v.toFixed(1) })
+    ];
+    const repSliders = [
+      this.mkSlider("rep", "count", "How many", 1, 60, { int: true }),
+      this.mkSlider("rep", "step", "Distance", 8, 260, { fmt: v => (v < 60 ? "close" : v < 150 ? "medium" : "far") }),
+      this.mkSlider("rep", "angle", "Direction", -180, 180, { fmt: v => Math.round(v) + "\u00b0" })
+    ];
+    const transformSliders = [
+      this.mkSlider("rep", "drift", "Spacing across copies", -0.35, 0.6, { fmt: v => (v < -0.04 ? "contracting" : v > 0.04 ? "expanding" : "constant") }),
+      this.mkSlider("rep", "rotDrift", "Rotation across copies", -45, 45, { fmt: v => Math.round(v) + "\u00b0 each" }),
+      this.mkSlider("rep", "scaleDrift", "Size across copies", -0.22, 0.22, { fmt: v => (v < -0.02 ? "shrinking" : v > 0.02 ? "growing" : "same") })
+    ];
+    const arrangeSliders = s.arrangement === "radial"
+      ? [
+          this.mkSlider("radial", "count", "Copies around", 3, 24, { int: true }),
+          this.mkSlider("radial", "radius", "Distance from centre", 40, 260),
+          this.mkSlider("rep", "rotDrift", "Extra turn each", -45, 45, { fmt: v => Math.round(v) + "\u00b0" })
+        ]
+      : s.arrangement === "linear"
+        ? [
+            this.mkSlider("rep", "count", "How many", 1, 60, { int: true }),
+            this.mkSlider("rep", "step", "Distance", 8, 260, { fmt: v => (v < 60 ? "close" : v < 150 ? "medium" : "far") }),
+            this.mkSlider("rep", "angle", "Direction", -180, 180, { fmt: v => Math.round(v) + "\u00b0" })
+          ]
+        : [
+            this.mkSlider("grid", "cols", "Across", 1, 16, { int: true }),
+            this.mkSlider("grid", "rows", "Down", 1, 16, { int: true }),
+            this.mkSlider("grid", "colStep", "Distance across", 30, 220),
+            this.mkSlider("grid", "rowStep", "Distance down", 30, 220)
+          ];
+    if (s.arrangement === "brick") arrangeSliders.push(this.mkSlider("grid", "offset", "Row shift", 0, 1, { fmt: v => Math.round(v * 100) + "%" }));
+    const pointSliders = editing ? [
+      this.mkSlider(s.editing, "sides", "Sides", 3, 14, { int: true, fmt: v => (v >= 13 ? "round" : String(v)) }),
+      this.mkSlider(s.editing, "rot", "Rotation", 0, 180, { fmt: v => Math.round(v) + "\u00b0" }),
+      this.mkSlider(s.editing, "squash", "Squash", 0.3, 1, { fmt: v => Math.round(v * 100) + "%" })
+    ] : [];
+
+    return {
+      canvasRef: this.canvasRef, surfaceRef: this.surfaceRef,
+      previewARef: this.previewARef, previewBRef: this.previewBRef, studioRef: this.studioRef,
+      gridOn: this.props.showGrid !== false,
+      stages: stageLabels.map((label, i) => ({ label, sep: i < 4 ? "\u2192" : "", color: i === stageIdx ? this.accent : "color-mix(in srgb, var(--color-text) 40%, transparent)" })),
+      challengeOn, taskNo: s.task + 1, taskText: TASKS[s.task % TASKS.length],
+      nextTask: () => this.setState({ task: (s.task + 1) % TASKS.length }),
+      toggleLevel: () => this.setState({ level: challengeOn ? "free" : "task" }),
+      freeBg: challengeOn ? "transparent" : this.accent, freeFg: challengeOn ? "var(--color-text)" : "var(--color-bg)",
+      taskBg: challengeOn ? this.accent : "transparent", taskFg: challengeOn ? "var(--color-bg)" : "var(--color-text)",
+      showInvite: !s.stroke && !s.drawing,
+      patternFieldVisible: s.motif && !s.shapeMode && !s.replaying,
+      patternViewLabel: s.patternView === "overview" ? "Pattern overview" : "Pattern detail",
+      patternFieldHint: s.patternView === "overview" ? "The whole field — original motif and its copies." : "Drag to travel across the field · pinch to inspect rhythm.",
+      hintVisible: s.drawing || s.replaying || s.grouped || s.shapeMode || (s.ghost.active && !s.ghost.prompt),
+      hintText: s.ghost.active && !s.ghost.prompt ? "Drag to place the second copy" : s.replaying ? "Replaying your movement \u2192 points \u2192 line" : s.shapeMode ? (s.sel !== null ? "Pull the round handles to bend the line" : "Drag a point \u00b7 tap the line to add one") : s.grouped ? "Drag to move \u00b7 pinch to rotate and scale" : "Recording your movement",
+      legendVisible: s.shapeMode && !s.replaying,
+      legendA: s.showMovement ? "Dashed \u2014 the line your movement made" : "Points far apart \u2014 your hand moved fast",
+      legendB: s.showMovement ? "Solid \u2014 the line you are designing" : "Points crowded \u2014 you moved slowly or paused",
+      onDown: this.onDown, onMove: this.onMove, onUp: this.onUp,
+      emptyBar: !s.selected && !s.shapeMode,
+      lineBar: s.selected && !s.shapeMode && !s.motif,
+      motifBar: s.selected && !s.shapeMode && s.motif,
+      shapeBar: s.shapeMode,
+      motifTag: s.motif && !s.shapeMode && !s.replaying,
+      makeMotif: () => this.setState({ motif: true, panel: null, patternView: "detail", fieldFilled: false, ghost: { active: true, prompt: false }, rep: { ...s.rep, count: 1 }, arrangement: "linear" }),
+      ghostPrompt: s.ghost.active && s.ghost.prompt,
+      ghostReading: "Direction " + Math.round(s.rep.angle) + "\u00b0 \u00b7 distance " + Math.round(s.rep.step),
+      acceptGhost: () => this.setState({ ghost: { active: false, prompt: false }, rep: { ...s.rep, count: 5 }, panel: "repeat" }),
+      openArrange: () => this.setState({ panel: s.panel === "arrange" ? null : "arrange", ghost: { active: false, prompt: false } }),
+      arrangeBg: pick(s.panel === "arrange").bg, arrangeFg: pick(s.panel === "arrange").fg,
+      arrangePanel: s.panel === "arrange",
+      pickLinear: () => this.setState({ arrangement: "linear" }),
+      pickGrid: () => this.setState({ arrangement: "grid" }),
+      pickBrick: () => this.setState({ arrangement: "brick" }),
+      pickRadial: () => this.setState({ arrangement: "radial" }),
+      linearBorder: s.arrangement === "linear" ? this.accent : "var(--color-divider)",
+      gridBorder: s.arrangement === "grid" ? this.accent : "var(--color-divider)",
+      brickBorder: s.arrangement === "brick" ? this.accent : "var(--color-divider)",
+      radialBorder: s.arrangement === "radial" ? this.accent : "var(--color-divider)",
+      arrangeSliders, transformSliders, fitView: this.fitView,
+      fillPattern: this.fillPattern,
+      fillBg2: s.fieldFilled ? this.accent : "transparent", fillFg2: s.fieldFilled ? "var(--color-bg)" : "var(--color-text)",
+      openCompare: () => this.setState({ panel: s.panel === "compare" ? null : "compare", ghost: { active: false, prompt: false } }),
+      compareBg: pick(s.panel === "compare").bg, compareFg: pick(s.panel === "compare").fg,
+      comparePanel: s.panel === "compare",
+      cmp1Ref: this.cmp1Ref, cmp2Ref: this.cmp2Ref, cmp3Ref: this.cmp3Ref, cmp4Ref: this.cmp4Ref,
+      compareNote: "One movement, four states. The pattern still carries the timing of your hand.",
+      predictOpen: !s.predict.asked,
+      predictMade: s.predict.asked,
+      guessLabel: s.predict.guess || "nothing yet",
+      guesses: ["It will fan out", "It will curl", "It will go diagonal", "Not sure yet"].map(label => ({
+        label,
+        onPick: () => this.setState({ predict: { asked: true, guess: label } })
+      })),
+      reopenPredict: () => this.setState({ predict: { asked: false, guess: null } }),
+      toggleMirror: () => this.setVal("rep", "mirror", !s.rep.mirror),
+      mirrorBg: pick(s.rep.mirror).bg, mirrorFg: pick(s.rep.mirror).fg,
+      toggleGlide: () => { if (s.rep.mirror) this.setVal("rep", "glide", !s.rep.glide); },
+      glideBg: pick(s.rep.glide && s.rep.mirror).bg, glideFg: pick(s.rep.glide && s.rep.mirror).fg,
+      glideOpacity: s.rep.mirror ? 1 : 0.4,
+      stageProgress: (stageIdx / 4) * 100 + "%",
+      menuOpen: s.menuOpen,
+      openMenu: () => this.setState({ menuOpen: true }),
+      closeMenu: () => this.setState({ menuOpen: false }),
+      levelSwitchLabel: challengeOn ? "Switch to free exploration" : "Switch to teacher tasks",
+      undo: this.undo, redo: this.redo,
+      undoOpacity: s.canUndo ? 1 : 0.35, redoOpacity: s.canRedo ? 1 : 0.35,
+      finishOpacity: s.stroke ? 1 : 0.45,
+      clearAll: () => { this.pushHistory(); this.setState({ stroke: null, nodes: null, sel: null, shapeMode: false, selected: false, panel: null, grouped: false, menuOpen: false, motif: false, patternView: "detail", fieldFilled: false, arrangement: "linear", ghost: { active: false, prompt: false }, rep: { ...s.rep, count: 1 }, group: { x: 0, y: 0, rot: 0, scale: 1 }, canUndo: true }); },
+      deleteLine: () => { this.pushHistory(); this.setState({ stroke: null, nodes: null, sel: null, shapeMode: false, selected: false, panel: null, grouped: false, motif: false, patternView: "detail", fieldFilled: false, ghost: { active: false, prompt: false }, canUndo: true }); },
+      finish: () => {
+        if (!s.stroke) return;
+        this.setState({ replaying: false, shapeMode: false, sel: null, showMovement: false, grouped: false, panel: null, menuOpen: false }, () => {
+          this.draw();
+          const cv = this.canvasRef.current;
+          if (!cv) return;
+          const out = document.createElement("canvas");
+          out.width = cv.width; out.height = cv.height;
+          const ctx = out.getContext("2d");
+          ctx.fillStyle = this.bg;
+          ctx.fillRect(0, 0, out.width, out.height);
+          ctx.drawImage(cv, 0, 0);
+          this.setState({ exportOpen: true, exportURL: out.toDataURL("image/png") });
+        });
+      },
+      exportOpen: s.exportOpen, exportURL: s.exportURL, exportImgRef: this.exportImgRef,
+      exportNote: patterned ? "One movement \u2192 one motif \u2192 this pattern." : s.motif ? "Your motif, ready to repeat." : "One line, made of your own movement.",
+      closeExport: () => this.setState({ exportOpen: false }),
+      replay: () => { this.replayStart = performance.now(); this.replayDur = 2200; this.setState({ replaying: true, panel: null }); },
+      replayBg: pick(s.replaying).bg, replayFg: pick(s.replaying).fg,
+      openShape: () => this.setState({ shapeMode: true, panel: null, replaying: false, grouped: false, sel: null, ghost: { active: false, prompt: false }, nodes: s.nodes || this.nodesFromStroke() }),
+      closeShape: () => this.setState({ shapeMode: false, sel: null }),
+      pointsBg: pick(s.shapeMode).bg, pointsFg: pick(s.shapeMode).fg,
+      removePoint: () => {
+        if (s.sel === null || !s.nodes || s.nodes.length < 4) return;
+        this.pushHistory();
+        const nodes = s.nodes.slice();
+        nodes.splice(s.sel, 1);
+        this.setState({ nodes, sel: null, canUndo: true });
+      },
+      removeOpacity: s.sel !== null && s.nodes && s.nodes.length > 3 ? 1 : 0.35,
+      toggleMovement: () => this.setState({ showMovement: !s.showMovement }),
+      movementBg: pick(s.showMovement).bg, movementFg: pick(s.showMovement).fg,
+      resetShape: () => { this.pushHistory(); this.setState({ nodes: this.nodesFromStroke(), sel: null, canUndo: true }); },
+      openCharacter: () => this.setState({ panel: s.panel === "character" ? null : "character" }),
+      charBg: pick(s.panel === "character").bg, charFg: pick(s.panel === "character").fg,
+      openRepeat: () => this.setState({ panel: s.panel === "repeat" ? null : "repeat", ghost: { active: false, prompt: false } }),
+      repBg: pick(s.panel === "repeat").bg, repFg: pick(s.panel === "repeat").fg,
+      characterPanel: s.panel === "character", repeatPanel: s.panel === "repeat",
+      closePanel: () => this.setState({ panel: null, editing: null }),
+      charSliders, repSliders, pointSliders,
+      pointStudio: !!editing,
+      editingName: s.editing === "A" ? "start" : "end",
+      editA: () => this.setState({ editing: "A" }), editB: () => this.setState({ editing: "B" }),
+      closeStudio: () => this.setState({ editing: null }),
+      copyAtoB: () => this.setState({ B: { ...s.A } }),
+      aName: this.pointName(s.A), bName: this.pointName(s.B),
+      aBorder: s.editing === "A" ? this.accent : "var(--color-divider)",
+      bBorder: s.editing === "B" ? this.accent : "var(--color-divider)",
+      toggleFill: () => { if (s.editing) this.setVal(s.editing, "filled", !s[s.editing].filled); },
+      fillLabel: editing && editing.filled ? "Filled" : "Outline",
+      fillBg: editing && editing.filled ? this.accent : "transparent",
+      fillFg: editing && editing.filled ? "var(--color-bg)" : "var(--color-text)",
+      toggleFollow: () => this.setVal("char", "follow", !c.follow),
+      followBg: pick(c.follow).bg, followFg: pick(c.follow).fg,
+      toggleColor: () => this.setVal("char", "red", !c.red),
+      colorLabel: c.red ? "Red" : "Ink",
+      colorBg: pick(c.red).bg, colorFg: pick(c.red).fg,
+      toggleGroup: () => this.setState({ grouped: !s.grouped }),
+      showDetail: () => this.setPatternView("detail"),
+      showOverview: () => this.setPatternView("overview"),
+      detailBg: pick(s.patternView === "detail").bg, detailFg: pick(s.patternView === "detail").fg,
+      overviewBg: pick(s.patternView === "overview").bg, overviewFg: pick(s.patternView === "overview").fg,
+      groupBg: pick(s.grouped).bg, groupFg: pick(s.grouped).fg,
+      repeatHint: s.grouped ? "Grouped. Drag the workspace to move the whole pattern, pinch to rotate and scale." : "Change one thing at a time and watch what the copies do.",
+      exportOpen2: false
+    };
+  }
+}
+
+</script>
+</body>
+</html>
